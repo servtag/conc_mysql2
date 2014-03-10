@@ -5,7 +5,7 @@ describe 'ConcMysql2' do
   describe 'Pool' do
 
     let(:pool_size) { 3 }
-    let(:clients) { Array.new(pool_size) { |i| double(:client, socket: i, async_result: i, query: nil) } }
+    let(:clients) { Array.new(pool_size) { |i| double(:client, socket: i, async_result: i, query: nil, ping: true) } }
     let(:ios) { ios = Array.new(pool_size) { |i| double(:io, to_i: i) } }
     let(:pool) do
       Mysql2::Client.should_receive(:new).and_return(*clients)
