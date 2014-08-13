@@ -1,5 +1,10 @@
 module ConcMysql2
 
+  RECONNECT_ERROR_MESSAGES = [
+      'MySQL server has gone away',
+      'Lost connection to MySQL server during query'
+  ]
+
   class Pool
 
     def initialize(options = { })
@@ -31,7 +36,7 @@ module ConcMysql2
         res
       })
     rescue Mysql2::Error, Errno::EBADF => e
-      raise e if e.is_a?(Mysql2::Error) && e.message != 'MySQL server has gone away'
+      raise e if e.is_a?(Mysql2::Error) && !RECONNECT_ERROR_MESSAGES.include?(e.message)
       reconnect!
       connected? ? execute(query_string) : raise(e)
     end

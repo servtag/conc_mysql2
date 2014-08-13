@@ -19,45 +19,55 @@ describe 'ConcMysql2' do
 
 
       it 'should call reconnect! unless connected' do
-        pool.stub(:connected?).and_return(false)
-
-        pool.should_receive(:reconnect!)
+        allow(pool).to receive(:connected?).and_return(false)
+        
+        expect(pool).to receive(:reconnect!)
 
         pool.execute('query')
       end
 
       it 'should call reconnect! on Errno::EBADF' do
-        pool.stub(:connected?).and_return(true)
+        allow(pool).to receive(:connected?).and_return(true)
 
         Array.new(pool_size) { pool.execute('query') }
 
         i=0
-        IO.stub(:select).with(ios, nil, nil, anything) do
+        allow(IO).to receive(:select).with(ios, nil, nil, anything) do
           raise Errno::EBADF if (i+=1) == 1
           [[ios.first]]
         end
 
-        pool.should_receive(:reconnect!)
+        expect(pool).to receive(:reconnect!)
 
         pool.execute('query')
       end
 
-      it 'should call reconnect! on MySQL server has gone away' do
-        pool.stub(:connected?).and_return(true)
+      it 'should call reconnect! on "MySQL server has gone away"' do
+        allow(pool).to receive(:connected?).and_return(true)
 
-        clients.last.should_receive(:query).and_raise(Mysql2::Error, 'MySQL server has gone away')
+        expect(clients.last).to receive(:query).and_raise(Mysql2::Error, 'MySQL server has gone away')
 
-        pool.should_receive(:reconnect!)
+        expect(pool).to receive(:reconnect!)
+
+        pool.execute('query')
+      end
+
+      it 'should call reconnect! on "Lost connection to MySQL server during query"' do
+        allow(pool).to receive(:connected?).and_return(true)
+
+        expect(clients.last).to receive(:query).and_raise(Mysql2::Error, 'Lost connection to MySQL server during query')
+
+        expect(pool).to receive(:reconnect!)
 
         pool.execute('query')
       end
 
       it 'should not call reconnect! on other Mysql2::Error' do
-        pool.stub(:connected?).and_return(true)
+        allow(pool).to receive(:connected?).and_return(true)
 
-        clients.last.should_receive(:query).and_raise(Mysql2::Error, 'foo')
+        expect(clients.last).to receive(:query).and_raise(Mysql2::Error, 'foo')
 
-        pool.should_not_receive(:reconnect!)
+        expect(pool).to_not receive(:reconnect!)
 
         expect { pool.execute('query') }.to raise_error(Mysql2::Error, 'foo')
       end
@@ -67,12 +77,11 @@ describe 'ConcMysql2' do
     describe 'reconnect!' do
 
       it 'should clear futures' do
-        pool.stub(:connected?).and_return(true)
+        allow(pool).to receive(:connected?).and_return(true)
 
         Array.new(pool_size) { pool.execute('query') }
 
         expect(_futures.size).to eq(pool_size)
-
 
         pool.reconnect!
 
@@ -83,9 +92,9 @@ describe 'ConcMysql2' do
         pool #initialize
 
         clients = Array.new(pool_size) { |i| double(:client, socket: i*10) }
-        Mysql2::Client.should_receive(:new).and_return(*clients)
+        expect(Mysql2::Client).to receive(:new).and_return(*clients)
 
-        clients.each { |client| IO.should_receive(:open).with(client.socket) }
+        clients.each { |client| expect(IO).to receive(:open).with(client.socket) }
 
         pool.reconnect!
       end
@@ -94,21 +103,21 @@ describe 'ConcMysql2' do
         pool #initialize
 
         clients = Array.new(pool_size) { double(:client, socket: nil) }
-        Mysql2::Client.should_receive(:new).and_return(*clients)
+        expect(Mysql2::Client).to receive(:new).and_return(*clients)
 
-        IO.stub(:open).exactly(3).times
-
-        p = pool.instance_variable_get(:@pool)
-        c = pool.instance_variable_get(:@clients)
+        expect(IO).to receive(:open).exactly(3).times
 
         pool.reconnect!
 
-        expect(p).to eq(c)
-        expect(p.object_id).not_to eq(c.object_id)
+        new_pool = pool.instance_variable_get(:@pool)
+        new_clients = pool.instance_variable_get(:@clients)
+
+        expect(new_pool).to match_array(new_clients)
+        expect(new_pool.object_id).not_to eq(new_clients.object_id)
       end
 
       it 'should close clients' do
-        _clients.each { |client| client.should_receive(:close) }
+        _clients.each { |client| expect(client).to receive(:close) }
 
         pool.reconnect!
       end

@@ -15,7 +15,7 @@ describe 'ConcMysql2' do
       it 'should call proc only once' do
         future = ConcMysql2::Future.new(proc = Proc.new { 'ignored' })
 
-        proc.should_receive(:call).once.and_return(4711)
+        expect(proc).to receive(:call).once.and_return(4711)
 
         10.times { future.__getobj__ }
       end
