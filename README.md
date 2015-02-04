@@ -11,8 +11,8 @@ pool = ConcMysql2::Pool.new(size: 5,
                             password: 'xxxxx')
 
 # Fire concurrent queries.                        
-res1 = pool.query('SELECT * FROM foo')
-res2 = pool.query('SELECT * FROM bar')
+res1 = pool.execute('SELECT * FROM foo')
+res2 = pool.execute('SELECT * FROM bar')
   
 # Block until result is available.
 puts res1.to_a.inspect
