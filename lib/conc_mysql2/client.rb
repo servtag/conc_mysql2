@@ -35,6 +35,7 @@ module ConcMysql2
     def reconnect!
       client.close
       @future = nil
+      @busy = false
       @client = Mysql2::Client.new(options)
     end
 

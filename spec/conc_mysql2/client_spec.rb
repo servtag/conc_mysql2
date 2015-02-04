@@ -92,6 +92,13 @@ describe 'ConcMysql2' do
         expect(client.future).to be_nil
       end
 
+      it 'should set busy to false' do
+        client.instance_variable_set(:@busy, true)
+        client.reconnect!
+
+        expect(client.busy?).to be_false
+      end
+
       it 'should open new connection' do
         expect(Mysql2::Client).to receive(:new)
         client.reconnect!
