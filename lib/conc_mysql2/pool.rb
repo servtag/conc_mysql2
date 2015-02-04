@@ -2,58 +2,45 @@ module ConcMysql2
 
   RECONNECT_ERROR_MESSAGES = [
       'MySQL server has gone away',
-      'Lost connection to MySQL server during query'
+      'Lost connection to MySQL server during query',
+      'closed MySQL connection'
   ]
 
   class Pool
 
     def initialize(options = { })
       @size = options.delete(:size)
-      @clients = []
-      @ios = []
-      @futures = {}
-      @options = options
-      reconnect!
+      @clients = Array.new(size || 5) { ConcMysql2::Client.new(options) }
     end
 
-    attr_reader :size, :options
+    attr_reader :clients, :size
 
     def execute(query_string)
-      reconnect! unless connected?
-
-      while (client = @pool.pop).nil? do
-        if (ready = IO::select(@ios, nil, nil, 1))
-          ready.flatten.each { |io| @futures[io.to_i].__getobj__ }
+      tries ||= size
+      while (client = available_client).nil? do
+        if (ready = IO::select(clients.map(&:io), nil, nil, 1))
+          ready.flatten.each { |io| client_by_io(io.to_i).future.__getobj__ }
         end
       end
 
-      client.query(query_string, async: true)
-
-      @futures[client.socket] = Future.new(Proc.new {
-        res = client.async_result
-        @futures.delete(client.socket)
-        @pool.push(client)
-        res
-      })
+      client.reconnect! unless client.connected?
+      client.query(query_string)
     rescue Mysql2::Error, Errno::EBADF => e
       raise e if e.is_a?(Mysql2::Error) && !RECONNECT_ERROR_MESSAGES.include?(e.message)
-      reconnect!
-      connected? ? execute(query_string) : raise(e)
+      retry unless (tries-=1).zero?
+      raise e
     end
 
-    def reconnect!
-      @clients.each(&:close)
-      @clients = Array.new(size || 5) { Mysql2::Client.new(options) }
-
-      @pool = @clients.dup
-
-      @ios = @pool.map { |client| IO::open(client.socket) }
-
-      @futures.clear
+    def available_client
+      available_clients.first
     end
 
-    def connected?
-      @pool.inject(true) { |bool, client| bool && client.ping }
+    def available_clients
+      clients.select { |client| !client.busy? }
+    end
+
+    def client_by_io(io)
+      clients.select { |client| client.io.to_i == io.to_i }.first
     end
 
   end
