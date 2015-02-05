@@ -1,7 +1,7 @@
 source "http://rubygems.org"
 # Add dependencies required to use your gem here.
 
-gem 'mysql2', '~> 0.3.15'
+gem 'mysql2', '~> 0.3.17'
 
 # Add dependencies to develop your gem here.
 # Include everything needed to run rake, tests, features, etc.
